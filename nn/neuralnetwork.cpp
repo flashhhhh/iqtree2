@@ -159,6 +159,7 @@ string NeuralNetwork::doModelInference() {
     OrtCUDAProviderOptions cuda_options;
     cuda_options.device_id = 0;  //GPU_ID
     cuda_options.cudnn_conv_algo_search = OrtCudnnConvAlgoSearchExhaustive; // Algo to search for Cudnn
+    cuda_options.cudnn_conv_use_max_workspace = 0;
     cuda_options.arena_extend_strategy = 0;
     // May cause data race in some condition
     cuda_options.do_copy_in_default_stream = 0;
