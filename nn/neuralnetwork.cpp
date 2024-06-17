@@ -172,10 +172,15 @@ string NeuralNetwork::doModelInference() {
     std::vector<const char*> values{"0", "0", "0", "0","1"};
 */
 
+/*
 // build-gpu-nn-cudnn_conv_use_max_workspace-0
     std::vector<const char*> keys{ "device_id","arena_extend_strategy", "cudnn_conv_algo_search", "do_copy_in_default_stream", "cudnn_conv_use_max_workspace"};
     std::vector<const char*> values{"0", "0", "0", "0","0"};
+*/
 
+// build-gpu-nn-conv_input_padding
+    std::vector<const char*> keys{ "device_id","arena_extend_strategy", "cudnn_conv_algo_search", "do_copy_in_default_stream", "cudnn_conv_use_max_workspace", "cudnn_conv1d_pad_to_nc1d"};
+    std::vector<const char*> values{"0", "0", "0", "0","1", "1"};
 
     api.UpdateCUDAProviderOptions(cuda_options, keys.data(), values.data(), keys.size());
 
