@@ -156,14 +156,25 @@ string NeuralNetwork::doModelInference() {
 #ifdef _CUDA
 //    session_options.SetLogSeverityLevel(1);
 //    cout << "creating CUDA environment" << endl;
-    OrtCUDAProviderOptions cuda_options;
-    cuda_options.device_id = 0;  //GPU_ID
-    cuda_options.cudnn_conv_algo_search = OrtCudnnConvAlgoSearchExhaustive; // Algo to search for Cudnn
-    cuda_options.cudnn_conv_use_max_workspace = 0;
-    cuda_options.arena_extend_strategy = 0;
-    // May cause data race in some condition
-    cuda_options.do_copy_in_default_stream = 0;
-    session_options.AppendExecutionProvider_CUDA(cuda_options); // Add CUDA options to session options
+    const auto& api = Ort::GetApi();
+    OrtCUDAProviderOptionsV2* cuda_options = nullptr;
+    api.CreateCUDAProviderOptions(&cuda_options);
+
+
+//    std::vector<const char*> keys{ "arena_extend_strategy", "cudnn_conv_algo_search", "do_copy_in_default_stream", "cudnn_conv_use_max_workspace", "use_ep_level_unified_stream"};
+//    std::vector<const char*> values{"0", "1", "1", "1","1"};
+//
+
+// define parameters as in the original code with using V2
+    std::vector<const char*> keys{ "device_id","arena_extend_strategy", "cudnn_conv_algo_search", "do_copy_in_default_stream", "cudnn_conv_use_max_workspace"};
+    std::vector<const char*> values{"0", "0", "0", "0","1"};
+
+    api.UpdateCUDAProviderOptions(cuda_options, keys.data(), values.data(), keys.size());
+
+
+    api.SessionOptionsAppendExecutionProvider_CUDA_V2(session_options,cuda_options); // Add CUDA options to session options
+
+    api.ReleaseCUDAProviderOptions(cuda_options);
 #endif
 
     Ort::Session session(env, model_path, session_options);
