@@ -149,6 +149,7 @@ string NeuralNetwork::doModelInference() {
     Ort::SessionOptions session_options;
     session_options.SetIntraOpNumThreads(1);
     session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
+    session_options.enable_profiling= true;
 
     const char *model_path = Params::getInstance().nn_path_model.c_str();
 
@@ -166,11 +167,11 @@ string NeuralNetwork::doModelInference() {
 //
 
 // define parameters as in the original code with using V2
-/*
+
 // build-gpu-nn-original
     std::vector<const char*> keys{ "device_id","arena_extend_strategy", "cudnn_conv_algo_search", "do_copy_in_default_stream", "cudnn_conv_use_max_workspace"};
     std::vector<const char*> values{"0", "0", "0", "0","1"};
-*/
+
 
 /*
 // build-gpu-nn-cudnn_conv_use_max_workspace-0
@@ -184,9 +185,12 @@ string NeuralNetwork::doModelInference() {
     std::vector<const char*> values{"0", "0", "0", "0","1", "1"};
 */
 
+/*
 // build-gpu-nn-cuda-graph
     std::vector<const char*> keys{ "device_id","arena_extend_strategy", "cudnn_conv_algo_search", "do_copy_in_default_stream", "cudnn_conv_use_max_workspace", "enable_cuda_graph"};
     std::vector<const char*> values{"0", "0", "0", "0","1", "1"};
+*/
+
 
     api.UpdateCUDAProviderOptions(cuda_options, keys.data(), values.data(), keys.size());
 
