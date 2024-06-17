@@ -166,8 +166,11 @@ string NeuralNetwork::doModelInference() {
 //
 
 // define parameters as in the original code with using V2
+// build-gpu-nn-original
     std::vector<const char*> keys{ "device_id","arena_extend_strategy", "cudnn_conv_algo_search", "do_copy_in_default_stream", "cudnn_conv_use_max_workspace"};
     std::vector<const char*> values{"0", "0", "0", "0","1"};
+
+
 
     api.UpdateCUDAProviderOptions(cuda_options, keys.data(), values.data(), keys.size());
 
@@ -257,9 +260,17 @@ string NeuralNetwork::doModelInference() {
     cudaEventCreate(&stop);
 
     cudaEventRecord(start);
-#endif
+
+    // build-i/o binding feature: build-gpu-nn-io-binding
+    Ort::RunOptions run_options;
+    run_options.AddConfigEntry("disable_synchronize_execution_providers", "1");
+        auto output_tensors = session.Run(run_options, input_node_names.data(), &input_tensor, 1,
+                                      output_node_names.data(), 1);
+#else
     auto output_tensors = session.Run(Ort::RunOptions{nullptr}, input_node_names.data(), &input_tensor, 1,
                                       output_node_names.data(), 1);
+#endif
+
     assert(output_tensors.size() == 1 && output_tensors.front().IsTensor());
 #ifdef _CUDA
     cudaEventRecord(stop);
