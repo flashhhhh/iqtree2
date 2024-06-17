@@ -149,8 +149,11 @@ string NeuralNetwork::doModelInference() {
     Ort::SessionOptions session_options;
     session_options.SetIntraOpNumThreads(1);
     session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
-    session_options.enable_profiling= true;
 
+ /*   // profile
+    char* profiling_path = "";
+    session_options.EnableProfiling(profiling_path);
+*/
     const char *model_path = Params::getInstance().nn_path_model.c_str();
 
 
@@ -190,6 +193,10 @@ string NeuralNetwork::doModelInference() {
     std::vector<const char*> keys{ "device_id","arena_extend_strategy", "cudnn_conv_algo_search", "do_copy_in_default_stream", "cudnn_conv_use_max_workspace", "enable_cuda_graph"};
     std::vector<const char*> values{"0", "0", "0", "0","1", "1"};
 */
+
+// build-gpu-nn-combination
+    std::vector<const char*> keys{ "device_id","arena_extend_strategy", "cudnn_conv_algo_search", "do_copy_in_default_stream", "cudnn_conv_use_max_workspace", "cudnn_conv1d_pad_to_nc1d"};
+    std::vector<const char*> values{"0", "0", "0", "0","0", "1"};
 
 
     api.UpdateCUDAProviderOptions(cuda_options, keys.data(), values.data(), keys.size());
@@ -282,15 +289,15 @@ string NeuralNetwork::doModelInference() {
     cudaEventRecord(start);
 
     // build-i/o binding feature: build-gpu-nn-io-binding
-/*    Ort::RunOptions run_options;
+  Ort::RunOptions run_options;
     run_options.AddConfigEntry("disable_synchronize_execution_providers", "1");
         auto output_tensors = session.Run(run_options, input_node_names.data(), &input_tensor, 1,
                                       output_node_names.data(), 1);
 #else
     auto output_tensors = session.Run(Ort::RunOptions{nullptr}, input_node_names.data(), &input_tensor, 1,
-                                      output_node_names.data(), 1);*/
+                                      output_node_names.data(), 1);
 #endif
-    auto output_tensors = session.Run(Ort::RunOptions{nullptr}, input_node_names.data(), &input_tensor, 1,
+//    auto output_tensors = session.Run(Ort::RunOptions{nullptr}, input_node_names.data(), &input_tensor, 1,
                                       output_node_names.data(), 1);
     assert(output_tensors.size() == 1 && output_tensors.front().IsTensor());
 #ifdef _CUDA
