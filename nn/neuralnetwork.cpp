@@ -170,11 +170,11 @@ string NeuralNetwork::doModelInference() {
 //
 
 // define parameters as in the original code with using V2
-
+/*
 // build-gpu-nn-original
     std::vector<const char*> keys{ "device_id","arena_extend_strategy", "cudnn_conv_algo_search", "do_copy_in_default_stream", "cudnn_conv_use_max_workspace"};
     std::vector<const char*> values{"0", "0", "0", "0","1"};
-
+*/
 
 /*
 // build-gpu-nn-cudnn_conv_use_max_workspace-0
