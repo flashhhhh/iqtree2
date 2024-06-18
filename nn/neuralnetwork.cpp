@@ -194,7 +194,13 @@ string NeuralNetwork::doModelInference() {
     std::vector<const char*> values{"0", "0", "0", "0","1", "1"};
 */
 
+/*
 // build-gpu-nn-combination
+    std::vector<const char*> keys{ "device_id","arena_extend_strategy", "cudnn_conv_algo_search", "do_copy_in_default_stream", "cudnn_conv_use_max_workspace", "cudnn_conv1d_pad_to_nc1d"};
+    std::vector<const char*> values{"0", "0", "0", "0","0", "1"};
+ */
+
+// build-gpu-nn-padding-and-mx-workspace-0
     std::vector<const char*> keys{ "device_id","arena_extend_strategy", "cudnn_conv_algo_search", "do_copy_in_default_stream", "cudnn_conv_use_max_workspace", "cudnn_conv1d_pad_to_nc1d"};
     std::vector<const char*> values{"0", "0", "0", "0","0", "1"};
 
@@ -289,16 +295,16 @@ string NeuralNetwork::doModelInference() {
     cudaEventRecord(start);
 
     // build-i/o binding feature: build-gpu-nn-io-binding
-  Ort::RunOptions run_options;
+/*  Ort::RunOptions run_options;
     run_options.AddConfigEntry("disable_synchronize_execution_providers", "1");
         auto output_tensors = session.Run(run_options, input_node_names.data(), &input_tensor, 1,
                                       output_node_names.data(), 1);
 #else
     auto output_tensors = session.Run(Ort::RunOptions{nullptr}, input_node_names.data(), &input_tensor, 1,
-                                      output_node_names.data(), 1);
+                                      output_node_names.data(), 1);*/
 #endif
-//    auto output_tensors = session.Run(Ort::RunOptions{nullptr}, input_node_names.data(), &input_tensor, 1,
-//                                      output_node_names.data(), 1);
+    auto output_tensors = session.Run(Ort::RunOptions{nullptr}, input_node_names.data(), &input_tensor, 1,
+                                      output_node_names.data(), 1);
     assert(output_tensors.size() == 1 && output_tensors.front().IsTensor());
 #ifdef _CUDA
     cudaEventRecord(stop);
