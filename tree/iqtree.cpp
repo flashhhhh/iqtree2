@@ -2684,6 +2684,7 @@ void IQTree::refineBootTrees() {
     deleteAllPartialLh();
 
     ModelsBlock *models_block = readModelsDefinition(*params);
+    Alignment* saved_aln = aln;
     
 	// do bootstrap analysis
 	for (int sample = refined_samples; sample < boot_trees.size(); sample++) {
@@ -2693,7 +2694,8 @@ void IQTree::refineBootTrees() {
             bootstrap_alignment = new SuperAlignment;
         else
             bootstrap_alignment = new Alignment;
-        bootstrap_alignment->createBootstrapAlignment(aln, NULL, params->bootstrap_spec);
+        // bootstrap_alignment->createBootstrapAlignment(aln, NULL, params->bootstrap_spec);
+        bootstrap_alignment->buildFromPatternFreq(*saved_aln, boot_samples_int[sample]);
 
         // create bootstrap tree
         IQTree *boot_tree;
@@ -2772,7 +2774,7 @@ void IQTree::refineBootTrees() {
         if (num_nnis.second != 0)
             refined_trees++;
 
-        if (verbose_mode >= VB_MED) {
+        /*if (verbose_mode >= VB_MED)*/ {
             cout << "UFBoot tree " << sample+1 << ": " << boot_logl[sample] << " -> " << boot_tree->getCurScore() << endl;
         }
 
