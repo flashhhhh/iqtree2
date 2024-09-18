@@ -2404,6 +2404,9 @@ double IQTree::doTreeSearch() {
 
     }
 
+    if (!early_stop)
+        sendStopMessage();
+
     // 2019-06-03: check convergence here to avoid effect of refineBootTrees
     if (boot_splits.size() >= 2 && MPIHelper::getInstance().isMaster()) {
         // check the stopping criterion for ultra-fast bootstrap
@@ -2411,11 +2414,10 @@ double IQTree::doTreeSearch() {
             cout << "WARNING: bootstrap analysis did not converge. You should rerun with higher number of iterations (-nm option)" << endl;
         
     }
+
+    MPIHelper::getInstance().barrier();
     
     if(params->ufboot2corr) refineBootTrees();
-
-    if (!early_stop)
-        sendStopMessage();
 
     readTreeString(candidateTrees.getBestTreeStrings()[0]);
 
@@ -2685,9 +2687,12 @@ void IQTree::refineBootTrees() {
 
     ModelsBlock *models_block = readModelsDefinition(*params);
     Alignment* saved_aln = aln;
+
+    printf("Process %d\n", MPIHelper::getInstance().getProcessID());
+    printf("Start %d, end %d\n", sample_start, sample_end);
     
 	// do bootstrap analysis
-	for (int sample = refined_samples; sample < boot_trees.size(); sample++) {
+	for (int sample = sample_start; sample < sample_end; sample++) {
         // create bootstrap alignment
         Alignment* bootstrap_alignment;
         if (aln->isSuperAlignment())
@@ -2774,8 +2779,9 @@ void IQTree::refineBootTrees() {
         if (num_nnis.second != 0)
             refined_trees++;
 
-        /*if (verbose_mode >= VB_MED)*/ {
-            cout << "UFBoot tree " << sample+1 << ": " << boot_logl[sample] << " -> " << boot_tree->getCurScore() << endl;
+        /* if (verbose_mode >= VB_MED) */ {
+            // cout << "UFBoot tree " << sample+1 << ": " << boot_logl[sample] << " -> " << boot_tree->getCurScore() << endl;
+            printf("UFBoot tree %d: %.2f -> %.2f\n", sample+1, boot_logl[sample], boot_tree->getCurScore());
         }
 
         stringstream ostr;
@@ -2813,6 +2819,21 @@ void IQTree::refineBootTrees() {
     delete models_block;
 
     cout << "Total " << refined_trees << " ufboot trees refined" << endl;
+
+    // Sync boot trees
+    MPIHelper::getInstance().barrier();
+
+    Checkpoint *new_checkpoint = new Checkpoint;
+
+    if (MPIHelper::getInstance().isWorker()) {
+        saveUFBoot(new_checkpoint);
+        MPIHelper::getInstance().sendCheckpoint(new_checkpoint, PROC_MASTER);
+    } else {
+        for (int i = 1; i < MPIHelper::getInstance().getNumProcesses(); i++) {
+            int worker = MPIHelper::getInstance().recvCheckpoint(new_checkpoint);
+            restoreUFBoot(new_checkpoint);
+        }
+    }
 
     // restore randstream
     finish_random();
