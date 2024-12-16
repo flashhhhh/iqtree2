@@ -3406,13 +3406,6 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
     if (MPIHelper::getInstance().isMaster()) {
         for (int model = 0; model <= rate_block; ++model) process(model);
 
-        // Dump checkpoint to file
-        // string checkpointFile = params.out_prefix;
-        // checkpointFile += ".temp.ckp.gz";
-
-        // ofstream outCheckpoint(checkpointFile.c_str());
-        // model_info.dump(outCheckpoint);
-
         // Send model_info to other processes
         for (int i = 1; i < MPIHelper::getInstance().getNumProcesses(); ++i) {
             MPIHelper::getInstance().sendCheckpoint(&model_info, i);
@@ -3430,16 +3423,23 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
     filterRatesMPI(rate_block);
     MPIHelper::getInstance().models->set_shared_memory(num_models, rate_block);
 
+    int numMessages = rate_block + 1;
     while (true) {
         int model = MPIHelper::getInstance().models->get_and_increment(num_models);
+        ++numMessages;
+
         if (model >= num_models) {
-            break;
+            if (MPIHelper::getInstance().isWorker() || numMessages >= num_models)
+                break;
         }
-        process(model);
+        
+        if (model < num_models) process(model);
 
         if (MPIHelper::getInstance().isMaster()) {
             // Get checkpoint from worker while gotMessage
             while (MPIHelper::getInstance().gotMessage()) {
+                ++numMessages;
+
                 Checkpoint *newCheckpoint = new Checkpoint;
                 int worker = MPIHelper::getInstance().recvCheckpoint(newCheckpoint);
                 newCheckpoint->transferSubCheckpoint(checkpoint, "");
@@ -3474,24 +3474,6 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
     merge();
 
     for (int model = 0; model < num_models; ++model) {
-        // // restore checkpoint
-        // string val;
-        // if (!checkpoint->getString(std::to_string(model), val)) continue;
-
-        // stringstream str(val);
-        // str >> at(model).subst_name >> at(model).rate_name >> at(model).logl >> at(model).df >> at(model).tree_len >> at(model).AIC_score >> at(model).AICc_score >> at(model).BIC_score;
-
-        // if (MPIHelper::getInstance().getProcessID() == 1) {
-        //     printf("%3d  %-13s %12.3f %3d %12.3f %12.3f %12.3f\n",
-        //            model + 1,
-        //            at(model).getName().c_str(),
-        //            -at(model).logl,
-        //            at(model).df,
-        //            at(model).AIC_score,
-        //            at(model).AICc_score,
-        //            at(model).BIC_score);
-        // }
-
         if (at(model).getScore() != DBL_MAX)
             at(model).setFlag(MF_DONE);
     }
