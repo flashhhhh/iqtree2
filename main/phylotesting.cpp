@@ -3308,31 +3308,12 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
             printf("Model %ld evaluated in %f seconds by process %d\n", model + 1, getRealTime() - cur, MPIHelper::getInstance().getProcessID());
 
             at(model).computeICScores();
-            double best_score = DBL_MAX;
-            for (int i = 0; i < num_models; ++i) {
-                if (MPIHelper::getInstance().models->get_shared_memory(i) != 0)
-                    best_score = min(best_score, MPIHelper::getInstance().models->get_shared_memory(i));
-            }
-            
+            at(model).setFlag(MF_DONE);
+
             MPIHelper::getInstance().models->set_shared_memory(model, at(model).getScore());
             model_info.putSubCheckpoint(&out_model_info, "");
 
-            // if (at(model).getScore() < best_score) {
-            //     if (model > rate_block) {
-            //         // Dump checkpoint to file
-            //         string checkpointFile = params.out_prefix;
-            //         checkpointFile += ".temp.ckp.gz";
-
-            //         ofstream outCheckpoint(checkpointFile.c_str());
-            //         model_info.dump(outCheckpoint);
-            //     }
-            // }
-
-            // Set flag
-            at(model).setFlag(MF_DONE);
-
             int lower_model = getLowerKModel(model);
-
             if (lower_model >= 0 && getScore(lower_model) < at(model).getScore()) {
                 // ignore all +R_k model with higher category
                 for (int higher_model = getHigherKModel(model); higher_model != -1;
@@ -3340,17 +3321,6 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
                     MPIHelper::getInstance().models->set_shared_memory(higher_model, DBL_MAX);
                 }
             }
-
-            // if (write_info) {
-            //     printf("%3d  %-13s %12.3f %3d %12.3f %12.3f %12.3f\n",
-            //     model + 1,
-            //     at(model).getName().c_str(),
-            //     -at(model).logl,
-            //     at(model).df,
-            //     at(model).AIC_score,
-            //     at(model).AICc_score,
-            //     at(model).BIC_score);
-            // }
 
             // save checkpoint
             stringstream ostr;
