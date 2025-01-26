@@ -3393,6 +3393,8 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
     filterRatesMPI(rate_block);
     MPIHelper::getInstance().models->set_shared_memory(num_models, rate_block);
 
+    MPIHelper::getInstance().barrier();
+
     int numMessages = rate_block + 1;
     while (true) {
         int model = MPIHelper::getInstance().models->get_and_increment(num_models);
