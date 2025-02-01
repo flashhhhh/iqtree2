@@ -2194,7 +2194,7 @@ string IQTree::optimizeBranches(int maxTraversal) {
 }
 
 double IQTree::doTreeSearch() {
-    
+
     if (params->numInitTrees > 1) {
         cout << "--------------------------------------------------------------------" << endl;
         cout << "|             INITIALIZING CANDIDATE TREE SET                      |" << endl;

@@ -3395,14 +3395,22 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
 
     MPIHelper::getInstance().barrier();
 
-    int numMessages = rate_block + 1;
+    int numStopCkpt = 0;
     while (true) {
         int model = MPIHelper::getInstance().models->get_and_increment(num_models);
-        ++numMessages;
 
         if (model >= num_models) {
-            if (MPIHelper::getInstance().isWorker() || numMessages >= num_models)
+            if (MPIHelper::getInstance().isWorker()) {
+                // Send stop signal to master
+
+                Checkpoint *stopCheckpoint = new Checkpoint;
+                stopCheckpoint->put("stop", "stop");
+                MPIHelper::getInstance().sendCheckpoint(stopCheckpoint, PROC_MASTER);
+
                 break;
+            } else if (numStopCkpt == MPIHelper::getInstance().getNumProcesses() - 1) {
+                break;
+            }
         }
         
         if (model < num_models) process(model);
@@ -3410,10 +3418,14 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
         if (MPIHelper::getInstance().isMaster()) {
             // Get checkpoint from worker while gotMessage
             while (MPIHelper::getInstance().gotMessage()) {
-                ++numMessages;
-
                 Checkpoint *newCheckpoint = new Checkpoint;
                 int worker = MPIHelper::getInstance().recvCheckpoint(newCheckpoint);
+
+                if (newCheckpoint->find("stop") != newCheckpoint->end()) {
+                    numStopCkpt++;
+                    continue;
+                }
+
                 newCheckpoint->transferSubCheckpoint(checkpoint, "");
 
                 // Cout the checkpoint
