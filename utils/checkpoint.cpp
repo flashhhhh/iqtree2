@@ -9,6 +9,7 @@
 #include "tools.h"
 #include "timeutil.h"
 #include "gzstream.h"
+#include "MPIHelper.h"
 #include <cstdio>
 
 const char* CKP_HEADER =     "--- # IQ-TREE Checkpoint ver >= 1.6";
@@ -152,6 +153,7 @@ void Checkpoint::dump(bool force) {
     }
     prev_dump_time = getRealTime();
     string filename_tmp = filename + ".tmp";
+    filename_tmp += MPIHelper::getInstance().getProcessID();
     if (fileExists(filename_tmp)) {
         outWarning("IQ-TREE was killed while writing temporary checkpoint file " + filename_tmp);
         outWarning("You should increase checkpoint interval from the default 60 seconds");
