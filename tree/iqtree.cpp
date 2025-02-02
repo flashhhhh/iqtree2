@@ -2777,8 +2777,8 @@ void IQTree::refineBootTrees() {
 
         if (verbose_mode >= VB_MED) {
             // cout << "UFBoot tree " << sample+1 << ": " << boot_logl[sample] << " -> " << boot_tree->getCurScore() << endl;
-            printf("UFBoot tree %d: %.2f -> %.2f\n", sample+1, boot_logl[sample], boot_tree->getCurScore());
         }
+        printf("UFBoot tree %d: %.2f -> %.2f\n", sample+1, boot_logl[sample], boot_tree->getCurScore());
 
         stringstream ostr;
         if (params->print_ufboot_trees == 2)
