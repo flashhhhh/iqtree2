@@ -153,7 +153,6 @@ void Checkpoint::dump(bool force) {
     }
     prev_dump_time = getRealTime();
     string filename_tmp = filename + ".tmp";
-    filename_tmp += convertIntToString(MPIHelper::getInstance().getProcessID());
     if (fileExists(filename_tmp)) {
         outWarning("IQ-TREE was killed while writing temporary checkpoint file " + filename_tmp);
         outWarning("You should increase checkpoint interval from the default 60 seconds");
