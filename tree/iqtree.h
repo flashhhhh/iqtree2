@@ -1022,5 +1022,6 @@ public:
     bool on_refine_btree;
     Alignment* saved_aln_on_refine_btree;
     vector<IntVector> boot_samples_int;
+    int numSynchronizedWorker = 0;
 };
 #endif
