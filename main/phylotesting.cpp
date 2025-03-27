@@ -1575,19 +1575,6 @@ string CandidateModel::evaluate(Params &params,
     ModelsBlock *models_block,
     int &num_threads, int brlen_type)
 {
-    // Load checkpoint from file
-    if (params.mpi_by_model) {
-        MPIHelper::getInstance().models->lock();
-        string checkpointFile = params.out_prefix;
-        checkpointFile += ".temp.ckp.gz";
-        ifstream checkpointStream(checkpointFile.c_str());
-        if (checkpointStream.is_open()) {
-            in_model_info.load(checkpointStream);
-            checkpointStream.close();
-        }
-        MPIHelper::getInstance().models->unlock();
-    }
-
     //string model_name = name;
     Alignment *in_aln = aln;
     IQTree *iqtree = NULL;
@@ -2513,7 +2500,7 @@ bool isMixtureModel(ModelsBlock *models_block, string &model_str) {
 }
 
 double CandidateModelSet::getScore(int idx) {
-    return ((Params::getInstance().mpi_by_model) ? MPIHelper::getInstance().models->get_shared_memory(idx) : at(idx).getScore());
+    return at(idx).getScore();
 }
 
 void CandidateModelSet::filterRates(int finished_model) {
@@ -2556,8 +2543,6 @@ void CandidateModelSet::filterRatesMPI(int finished_model) {
         }
     }
     
-    MPIHelper::getInstance().barrier();
-    
     double ok_score = best_score + Params::getInstance().score_diff_thres;
     set<string> ok_rates;
     for (model = 0; model <= finished_model; model++) {
@@ -2569,9 +2554,10 @@ void CandidateModelSet::filterRatesMPI(int finished_model) {
             printf("Process %d, Rate %s\n", MPIHelper::getInstance().getProcessID(), rate_name.c_str());
         }
     }
+
     for (model = finished_model+1; model < size(); model++)
         if (ok_rates.find(at(model).orig_rate_name) == ok_rates.end())
-            MPIHelper::getInstance().models->set_shared_memory(model, DBL_MAX);
+            at(model).setFlag(MF_IGNORED);
 }
 
 void CandidateModelSet::filterSubst(int finished_model) {
@@ -3272,14 +3258,11 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
 
     Checkpoint *checkpoint = new Checkpoint;
 
-    MPIHelper::getInstance().models = new MPI_SharedWindow(num_models + 1);
+    MPIHelper::getInstance().modelID = new MPI_SharedWindow(1);
 
-    // initialzie all model scores to 0 (not been evaluated)
-
-    MPIHelper::getInstance().barrier();
-
+    double best_score = DBL_MAX;
     auto process = [&](int model) {
-        if (MPIHelper::getInstance().models->get_shared_memory(model) != DBL_MAX) {
+        if (!at(model).hasFlag(MF_IGNORED) && !at(model).hasFlag(MF_DONE)) {
             // optimize model parameters
             // keep separate output model_info to only update model_info if better model found
             ModelCheckpoint out_model_info;
@@ -3293,28 +3276,9 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
             printf("Model %ld evaluated in %f seconds by process %d\n", model + 1, getRealTime() - cur, MPIHelper::getInstance().getProcessID());
 
             at(model).computeICScores();
-            double best_score = DBL_MAX;
-            for (int i = 0; i < num_models; ++i) {
-                if (MPIHelper::getInstance().models->get_shared_memory(i) != 0)
-                    best_score = min(best_score, MPIHelper::getInstance().models->get_shared_memory(i));
-            }
-            
-            MPIHelper::getInstance().models->set_shared_memory(model, at(model).getScore());
 
             if (at(model).getScore() < best_score) {
                 model_info.putSubCheckpoint(&out_model_info, "");
-
-                if (model > rate_block) {
-                    MPIHelper::getInstance().models->lock();
-                    // Dump checkpoint to file
-                    string checkpointFile = params.out_prefix;
-                    checkpointFile += ".temp.ckp.gz";
-
-                    ofstream outCheckpoint(checkpointFile.c_str());
-                    model_info.dump(outCheckpoint);
-                    
-                    MPIHelper::getInstance().models->unlock();
-                }
             }
 
             // Set flag
@@ -3326,20 +3290,9 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
                 // ignore all +R_k model with higher category
                 for (int higher_model = getHigherKModel(model); higher_model != -1;
                     higher_model = getHigherKModel(higher_model)) {
-                    MPIHelper::getInstance().models->set_shared_memory(higher_model, DBL_MAX);
+                    at(higher_model).setFlag(MF_IGNORED);
                 }
             }
-
-            // if (write_info) {
-            //     printf("%3d  %-13s %12.3f %3d %12.3f %12.3f %12.3f\n",
-            //     model + 1,
-            //     at(model).getName().c_str(),
-            //     -at(model).logl,
-            //     at(model).df,
-            //     at(model).AIC_score,
-            //     at(model).AICc_score,
-            //     at(model).BIC_score);
-            // }
 
             // save checkpoint
             stringstream ostr;
@@ -3386,34 +3339,25 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
             }
 
             checkpoint->clear();
-        }    
-        for (int model = 0; model < num_models; ++model)
-            if (at(model).getScore() != DBL_MAX)
-                at(model).setFlag(MF_DONE);
+        }
     };
 
     if (MPIHelper::getInstance().isMaster()) {
-        for (int model = 0; model <= rate_block; ++model) process(model);
-
-        // Dump checkpoint to file
-        string checkpointFile = params.out_prefix;
-        checkpointFile += ".temp.ckp.gz";
-
-        ofstream outCheckpoint(checkpointFile.c_str());
-        model_info.dump(outCheckpoint);
+        for (int model = 0; model <= rate_block; ++model) {
+            process(model);
+        }
     }
+
+    MPIHelper::getInstance().barrier();
+
     merge();
 
     MPIHelper::getInstance().barrier();
-    
     filterRatesMPI(rate_block);
-    MPIHelper::getInstance().models->set_shared_memory(num_models, rate_block);
-
-    MPIHelper::getInstance().barrier();
 
     int numStopCkpt = 0;
     while (true) {
-        int model = MPIHelper::getInstance().models->get_and_increment(num_models);
+        int model = MPIHelper::getInstance().modelID->get_and_increment(0);
 
         if (model >= num_models) {
             if (MPIHelper::getInstance().isWorker()) {
@@ -3475,6 +3419,7 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
     merge();
 
     MPIHelper::getInstance().barrier();
+
     // store the best model
     ModelTestCriterion criteria[] = {MTC_AIC, MTC_AICC, MTC_BIC};
     for (auto mtc : criteria) {

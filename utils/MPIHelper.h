@@ -46,9 +46,9 @@ public:
 
     ~MPI_SharedWindow();
 
-    double get_shared_memory(int idx);
+    int get_shared_memory(int idx);
 
-    void set_shared_memory(int idx, double value);
+    void set_shared_memory(int idx, int value);
 
     void lock();
 
@@ -58,7 +58,7 @@ public:
 
 private:
     MPI_Win window;
-    double* shared_memory;
+    int* shared_memory;
     int world_rank;
     int num_elements;
     int depth_lock;
@@ -225,10 +225,8 @@ public:
     void setNumNNISearch(int numNNISearch) {
         MPIHelper::numNNISearch = numNNISearch;
     }
-
-    int numModels;
     
-    MPI_SharedWindow* models;
+    MPI_SharedWindow* modelID;
 private:
     int numNNISearch;
 
