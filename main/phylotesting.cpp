@@ -3351,7 +3351,9 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
     MPIHelper::getInstance().barrier();
 
     merge();
-
+    if (MPIHelper::getInstance().isMaster()) {
+        MPIHelper::getInstance().modelID->set_shared_memory(0, rate_block + 1);
+    }
     MPIHelper::getInstance().barrier();
     filterRatesMPI(rate_block);
 
