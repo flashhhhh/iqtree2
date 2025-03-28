@@ -3342,12 +3342,25 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
         }
     };
 
+    auto sendModelInfoAndBestTree = [&]() {
+        if (MPIHelper::getInstance().isMaster()) {
+            for (int i = 1; i < MPIHelper::getInstance().getNumProcesses(); ++i) {
+                MPIHelper::getInstance().sendCheckpoint(&model_info, i);
+            }
+        } else {
+            MPIHelper::getInstance().recvCheckpoint(&model_info, PROC_MASTER);
+        }
+    };
+
     if (MPIHelper::getInstance().isMaster()) {
         for (int model = 0; model <= rate_block; ++model) {
             process(model);
         }
     }
 
+    MPIHelper::getInstance().barrier();
+
+    sendModelInfoAndBestTree();
     MPIHelper::getInstance().barrier();
 
     merge();
