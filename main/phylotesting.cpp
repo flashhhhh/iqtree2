@@ -3277,7 +3277,10 @@ CandidateModel CandidateModelSet::evaluateMPI(Params &params, PhyloTree* in_tree
 
             at(model).computeICScores();
 
+            printf("Best score %f\n", best_score);
+
             if (at(model).getScore() < best_score) {
+                best_score = at(model).getScore();
                 model_info.putSubCheckpoint(&out_model_info, "");
             }
 
