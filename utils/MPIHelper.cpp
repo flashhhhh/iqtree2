@@ -31,11 +31,21 @@ void MPIHelper::init(int argc, char *argv[]) {
     setNumTreeReceived(0);
     setNumTreeSent(0);
     setNumNNISearch(0);
+
+    char processor_name[MPI_MAX_PROCESSOR_NAME];
+    int name_len;
+    MPI_Get_processor_name(processor_name, &name_len);
+    printf("[Rank %d] Running on Node: %s\n", getProcessID(), processor_name);
 #endif
 }
 
 void MPIHelper::finalize() {
 #ifdef _IQTREE_MPI
+    if (models != nullptr) {
+        delete models; 
+        models = nullptr;
+    }
+
     MPI_Finalize();
 #endif
 }
@@ -214,30 +224,31 @@ MPIHelper::~MPIHelper() {
 #ifdef _IQTREE_MPI
 MPI_SharedWindow::MPI_SharedWindow(int num_elements)
     : window(MPI_WIN_NULL), shared_memory(nullptr), num_elements(num_elements), depth_lock(0) {
-    MPI_Info win_info;
-    MPI_Info_create(&win_info);
-
-    // Create shared memory window for all processes
-    MPI_Win_allocate_shared(MPIHelper::getInstance().isMaster() ? sizeof(double) * num_elements : 0, sizeof(double), win_info, MPI_COMM_WORLD, &shared_memory, &window);
-    MPI_Info_free(&win_info);
+    
+    // Only the Master allocates the actual storage. 
+    // Workers allocate 0 bytes; they will access Master's memory remotely.
+    MPI_Aint size = 0;
     if (MPIHelper::getInstance().isMaster()) {
-        // Initialize shared memory
+        size = (MPI_Aint)num_elements * sizeof(double);
+    }
+
+    // MPI_Win_allocate creates a window that is accessible across the network (nodes).
+    MPI_Win_allocate(size, sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &shared_memory, &window);
+
+    // Master can access 'shared_memory' directly as a local pointer.
+    if (MPIHelper::getInstance().isMaster()) {
         for (int i = 0; i < num_elements; i++) {
             shared_memory[i] = 0;
         }
     }
+
+    // Ensure Master has finished initialization before any Worker tries to read/write
     MPI_Barrier(MPI_COMM_WORLD);
-    // Map shared memory for other processes
-    if (MPIHelper::getInstance().isWorker()) {
-        MPI_Aint size;
-        int disp_unit;
-        MPI_Win_shared_query(window, 0, &size, &disp_unit, &shared_memory);
-    }
 }
 
 MPI_SharedWindow::~MPI_SharedWindow() {
     if (window != MPI_WIN_NULL) {
-        MPI_Win_free(&window);  // Free the window before MPI_Finalize
+        MPI_Win_free(&window);
     }
 }
 
@@ -245,7 +256,7 @@ double MPI_SharedWindow::get_shared_memory(int idx) {
     assert(idx < num_elements);
     double ret;
     lock();
-    MPI_Get(&ret, 1, MPI_DOUBLE, 0, idx, 1, MPI_DOUBLE, window);
+    MPI_Get(&ret, 1, MPI_DOUBLE, PROC_MASTER, idx, 1, MPI_DOUBLE, window);
     unlock();
     return ret;
 }
@@ -253,7 +264,7 @@ double MPI_SharedWindow::get_shared_memory(int idx) {
 void MPI_SharedWindow::set_shared_memory(int idx, double value) {
     assert(idx < num_elements);
     lock();
-    MPI_Put(&value, 1, MPI_DOUBLE, 0, idx, 1, MPI_DOUBLE, window);
+    MPI_Put(&value, 1, MPI_DOUBLE, PROC_MASTER, idx, 1, MPI_DOUBLE, window);
     unlock();
 }
 
@@ -262,19 +273,19 @@ int MPI_SharedWindow::get_and_increment(int idx) {
     double one = 1;
     double ret;
     lock();
-    MPI_Fetch_and_op(&one, &ret, MPI_DOUBLE, 0, idx, MPI_SUM, window);
+    MPI_Fetch_and_op(&one, &ret, MPI_DOUBLE, PROC_MASTER, idx, MPI_SUM, window);
     unlock();
     return ret;
 }
 
 void MPI_SharedWindow::lock() {
     if (!depth_lock++)
-        MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, window);
+        MPI_Win_lock(MPI_LOCK_EXCLUSIVE, PROC_MASTER, 0, window);
 }
 
 void MPI_SharedWindow::unlock() {
     if (!--depth_lock)
-        MPI_Win_unlock(0, window);
+        MPI_Win_unlock(PROC_MASTER, window);
 }
 
 #endif
